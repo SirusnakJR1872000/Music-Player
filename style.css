@@ -12,9 +12,15 @@ html, body {
   height: 100%;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   min-height: 100vh;
   min-height: 100dvh;
+  overflow: hidden;
   background: #140c18;
   font-family: Outfit, sans-serif;
   color: var(--ink);
@@ -27,6 +33,11 @@ button {
   border: 0;
   background: none;
   padding: 0;
+}
+
+button,
+.track {
+  touch-action: manipulation;
 }
 
 button:focus-visible,
@@ -47,10 +58,27 @@ button:focus-visible,
 
 .stage {
   position: relative;
-  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+}
+
+.topbar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding:
+    max(12px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    0
+    max(16px, env(safe-area-inset-left));
 }
 
 .poster {
@@ -65,17 +93,18 @@ button:focus-visible,
 }
 
 .picker {
-  position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  right: max(16px, env(safe-area-inset-right));
-  z-index: 3;
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .picker-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: min(240px, calc(100vw - 140px));
+  max-width: min(240px, 100%);
   height: 36px;
   padding: 0 12px 0 14px;
   border-radius: 999px;
@@ -135,10 +164,9 @@ button:focus-visible,
 }
 
 .status {
-  position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  left: max(16px, env(safe-area-inset-left));
+  position: relative;
   z-index: 2;
+  flex: none;
   margin: 0;
   padding: 6px 12px;
   border-radius: 999px;
@@ -151,16 +179,18 @@ button:focus-visible,
 }
 
 .hero {
-  position: absolute;
-  left: 50%;
-  top: 40%;
-  transform: translate(-50%, -50%);
+  position: relative;
+  z-index: 1;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
-  width: min(640px, calc(100% - 32px));
-  padding: 0 8px;
+  width: min(640px, calc(100% - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  min-height: 0;
+  margin: 0 auto;
+  padding: 8px 8px 4vh;
 }
 
 .heart {
@@ -187,6 +217,7 @@ h1 {
 
 .kicker {
   margin: 8px 0 0;
+  max-width: 100%;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.32em;
@@ -205,6 +236,7 @@ h1 {
 
 .tagline {
   margin: 12px 0 0;
+  max-width: 100%;
   font-family: "Cormorant Garamond", serif;
   font-style: italic;
   font-weight: 500;
@@ -224,11 +256,11 @@ h1 {
 }
 
 .player {
-  position: absolute;
-  left: 50%;
-  bottom: max(20px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  width: min(var(--player-width), calc(100% - 32px));
+  position: relative;
+  z-index: 2;
+  flex: none;
+  margin: 0 auto max(16px, env(safe-area-inset-bottom));
+  width: min(var(--player-width), calc(100% - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;
   grid-template-areas:
@@ -375,14 +407,19 @@ h1 {
   color: #ffe1ea;
 }
 
-@media (max-width: 640px) {
-  h1 { font-size: clamp(56px, 16vw, 76px); }
-  .kicker { font-size: 11px; letter-spacing: 0.22em; text-indent: 0.22em; }
+@media (min-width: 701px) and (max-width: 1100px) {
+  :root { --player-width: 640px; }
+  h1 { font-size: clamp(72px, 10vw, 100px); }
+  .hero { width: min(720px, calc(100% - 48px)); }
+}
+
+@media (max-width: 700px) {
+  h1 { font-size: clamp(52px, 15vw, 76px); }
+  .kicker { font-size: 11px; letter-spacing: 0.18em; text-indent: 0.18em; }
   .tagline { font-size: 17px; }
-  .hero { top: 38%; }
+  .hero { width: calc(100% - 24px); padding-bottom: 12px; }
   .player {
-    width: calc(100% - 20px);
-    bottom: max(12px, env(safe-area-inset-bottom));
+    width: calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right));
     grid-template-columns: 44px minmax(0, 1fr);
     grid-template-areas:
       "art meta"
@@ -393,18 +430,39 @@ h1 {
     border-radius: 18px;
   }
   .art-wrap { width: 44px; height: 44px; }
-  .transport { justify-content: flex-end; }
+  .transport { justify-content: center; }
+  .transport button { width: 44px; height: 44px; }
+  .transport .transport-play { width: 48px; height: 48px; }
+  .track { height: 28px; }
   .meta strong { font-size: 14px; }
+  .picker-toggle { height: 40px; }
 }
 
-@media (max-height: 700px) {
-  .hero { top: 36%; }
-  h1 { font-size: clamp(48px, 12vh, 80px); }
-  .tagline { margin-top: 8px; font-size: 16px; }
+@media (max-height: 740px) {
+  .hero { padding-bottom: 0; }
+  h1 { font-size: clamp(44px, 11vh, 80px); }
+  .kicker { margin-top: 4px; }
+  .tagline { margin-top: 6px; font-size: 16px; }
   .brush { margin-top: 4px; }
-  .player { bottom: 12px; }
+  .page-status { margin-top: 8px; }
 }
 
-@media (min-width: 1200px) {
-  .hero { top: 42%; }
+@media (max-height: 520px) {
+  .topbar { padding-top: max(8px, env(safe-area-inset-top)); }
+  .heart { width: 16px; height: 16px; margin-bottom: 0; }
+  h1 { font-size: clamp(34px, 16vh, 48px); }
+  .kicker { font-size: 10px; letter-spacing: 0.14em; text-indent: 0.14em; }
+  .tagline { margin-top: 2px; font-size: 14px; }
+  .player {
+    margin-bottom: max(8px, env(safe-area-inset-bottom));
+    padding: 8px 10px;
+    row-gap: 2px;
+  }
+}
+
+@media (pointer: coarse) {
+  .track { height: 28px; }
+  .transport button { width: 44px; height: 44px; }
+  .transport .transport-play { width: 48px; height: 48px; }
+  .picker-menu button { padding: 12px; font-size: 15px; }
 }
