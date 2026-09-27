@@ -40,5 +40,14 @@ const CONFIG = {
       image: "long_drive.png",
       playlistId: "PLPm2B40R0vkaotipqx8H11uQQTS8PgScR",
     },
+    {
+      id: "classic-songs",
+      label: "Classic Songs",
+      title: "Classic",
+      kicker: "Bollywood Songs",
+      tagline: "Golden Era. Timeless Voices.",
+      image: "classic_songs.png",
+      playlistId: "PLPm2B40R0vkYr1H1i7RBJCyNap0ysIQZm",
+    },
   ],
 };
