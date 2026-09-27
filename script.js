@@ -14,6 +14,11 @@ let playWhenReady = false;
 let userWantsPlayback = false;
 let hiddenResumeAttempts = 0;
 let progressTicks = 0;
+let lyricsToken = 0;
+let lyricsForId = "";
+let syncedLines = [];
+let lyricsFollowTime = false;
+let activeLyricIndex = -1;
 
 function isPlaceholder(value) {
   return !value || String(value).includes("YOUR_");
@@ -66,6 +71,11 @@ function bindUi() {
     if (!event.target.closest(".picker")) closePlaylistMenu();
   });
   document.addEventListener("keydown", onKeyDown);
+  $("lyricsToggle")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setLyricsEnabled(!document.body.classList.contains("lyrics-on"));
+  });
+  setLyricsEnabled(savedLyricsEnabled());
   bindMediaSession();
   bindBackgroundPlayback();
   setupAnalytics();
@@ -407,6 +417,8 @@ function updateNowPlaying() {
   setImage($("barArt"), bestThumb(snippet.thumbnails));
   if (!isPlaying && song.durationSeconds) $("duration").textContent = formatTime(song.durationSeconds);
   updateMediaSession();
+  const videoId = snippet.resourceId?.videoId || "";
+  if (videoId && videoId !== lyricsForId) loadLyrics(song);
 }
 
 function startProgressTracking() {
@@ -426,6 +438,7 @@ function updateProgress() {
     $("currentTime").textContent = formatTime(current);
     $("duration").textContent = formatTime(total);
     if (progressTicks++ % 4 === 0) updatePositionState(current, total);
+    highlightLyric(current);
   } catch (err) {
     // Metadata is not ready until playback starts.
   }
@@ -701,6 +714,203 @@ function showLoading() {
   setText("songTitle", "Loading playlist");
   setText("channelName", "");
   if ($("pageStatus")) $("pageStatus").hidden = true;
+  lyricsForId = "";
+  syncedLines = [];
+  lyricsFollowTime = false;
+  activeLyricIndex = -1;
+  renderLyricsMessage("Lyrics will appear with the song.");
+}
+
+function savedLyricsEnabled() {
+  try {
+    return localStorage.getItem("music-player-lyrics") !== "off";
+  } catch (err) {
+    return true;
+  }
+}
+
+function setLyricsEnabled(on) {
+  document.body.classList.toggle("lyrics-on", on);
+  const toggle = $("lyricsToggle");
+  if (toggle) {
+    toggle.setAttribute("aria-pressed", String(on));
+    toggle.setAttribute("aria-label", on ? "Turn lyrics off" : "Turn lyrics on");
+  }
+  const panel = $("lyricsPanel");
+  if (panel) panel.hidden = !on;
+  try {
+    localStorage.setItem("music-player-lyrics", on ? "on" : "off");
+  } catch (err) {
+    // The choice still applies for this visit.
+  }
+}
+
+function renderLyricsMessage(message) {
+  const body = $("lyricsBody");
+  if (!body) return;
+  body.style.height = "";
+  body.replaceChildren();
+  const status = document.createElement("p");
+  status.className = "lyrics-status";
+  status.textContent = message;
+  body.append(status);
+}
+
+function lyricsSearchTitle(title) {
+  return cleanTitle(title)
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function loadLyrics(song) {
+  const videoId = song?.snippet?.resourceId?.videoId || "";
+  const token = ++lyricsToken;
+  lyricsForId = videoId;
+  syncedLines = [];
+  lyricsFollowTime = false;
+  activeLyricIndex = -1;
+  renderLyricsMessage("Finding lyrics…");
+
+  const track = lyricsSearchTitle(song.snippet?.title || "");
+  const artist = artistName(song);
+  const duration = Number(song.durationSeconds) || 0;
+  if (!track) {
+    renderLyricsMessage("Lyrics aren’t available for this song.");
+    return;
+  }
+
+  try {
+    const record = await findLyrics(track, artist, duration);
+    if (token !== lyricsToken) return;
+    if (!record || record.instrumental || (!record.plainLyrics && !record.syncedLyrics)) {
+      renderLyricsMessage("Lyrics aren’t available for this song.");
+      return;
+    }
+    syncedLines = parseSyncedLyrics(record.syncedLyrics);
+    lyricsFollowTime = syncedLines.length > 0;
+    if (!syncedLines.length) {
+      syncedLines = plainLyricLines(record.plainLyrics, duration);
+      lyricsFollowTime = duration > 0 && syncedLines.length > 1;
+    }
+    if (!syncedLines.length) {
+      renderLyricsMessage("Lyrics aren’t available for this song.");
+      return;
+    }
+    renderLyricLines();
+  } catch (err) {
+    if (token !== lyricsToken) return;
+    renderLyricsMessage("Lyrics aren’t available for this song.");
+  }
+}
+
+function hasLyricText(item) {
+  return Boolean(item && !item.instrumental && (item.plainLyrics || item.syncedLyrics));
+}
+
+async function findLyrics(track, artist, duration) {
+  const candidates = [];
+  const exact = new URL("https://lrclib.net/api/get");
+  exact.searchParams.set("track_name", track);
+  if (artist) exact.searchParams.set("artist_name", artist);
+  if (duration > 0) exact.searchParams.set("duration", String(Math.round(duration)));
+  const exactResponse = await fetch(exact);
+  if (exactResponse.ok) {
+    const record = await exactResponse.json();
+    if (hasLyricText(record)) candidates.push(record);
+  }
+
+  const search = new URL("https://lrclib.net/api/search");
+  search.searchParams.set("track_name", track);
+  if (artist) search.searchParams.set("artist_name", artist);
+  const searchResponse = await fetch(search);
+  if (searchResponse.ok) {
+    const matches = await searchResponse.json();
+    if (Array.isArray(matches)) candidates.push(...matches.filter(hasLyricText));
+  }
+
+  return candidates.sort((a, b) => lyricScore(a, track, duration) - lyricScore(b, track, duration))[0] || null;
+}
+
+function lyricScore(item, track, duration) {
+  const name = String(item.trackName || "").toLowerCase();
+  const wanted = String(track || "").toLowerCase();
+  let score = 0;
+  if (name !== wanted) score += 40;
+  if (/\b(lofi|remix|karaoke|instrumental|reprise|slowed)\b/.test(name)) score += 80;
+  if (!item.syncedLyrics) score += 8;
+  if (duration > 0 && item.duration > 0) score += Math.abs(item.duration - duration) / 8;
+  return score;
+}
+
+function parseSyncedLyrics(value) {
+  const lines = [];
+  String(value || "").split(/\r?\n/).forEach((row) => {
+    const stamps = [...row.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    const text = row.replace(/\[[\d:.]+\]/g, "").trim();
+    if (!stamps.length || !text) return;
+    stamps.forEach((stamp) => {
+      lines.push({ time: Number(stamp[1]) * 60 + Number(stamp[2]), text });
+    });
+  });
+  return lines.sort((a, b) => a.time - b.time);
+}
+
+function plainLyricLines(value, duration) {
+  const rows = String(value || "").split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+  if (!rows.length) return [];
+  const step = duration > 0 ? duration / rows.length : 0;
+  return rows.map((text, index) => ({ time: step * index, text }));
+}
+
+function renderLyricLines() {
+  const body = $("lyricsBody");
+  if (!body || !syncedLines.length) return;
+  body.replaceChildren();
+  const track = document.createElement("div");
+  track.className = "lyrics-track";
+  track.id = "lyricsTrack";
+  syncedLines.forEach((line) => {
+    const paragraph = document.createElement("p");
+    paragraph.className = "lyrics-line is-upcoming";
+    paragraph.textContent = line.text;
+    track.append(paragraph);
+  });
+  body.append(track);
+  activeLyricIndex = -1;
+  positionLyric(0, false);
+}
+
+function positionLyric(index, animate) {
+  const body = $("lyricsBody");
+  const track = $("lyricsTrack");
+  const line = track?.children[index];
+  if (!body || !track || !line) return;
+  activeLyricIndex = index;
+  [...track.children].forEach((item, lineIndex) => {
+    item.classList.toggle("is-current", lineIndex === index);
+    item.classList.toggle("is-upcoming", lineIndex !== index);
+  });
+  const visibleCount = Math.min(4, track.children.length - index);
+  let height = 0;
+  for (let i = 0; i < visibleCount; i += 1) height += track.children[index + i].offsetHeight;
+  height += 12 * Math.max(0, visibleCount - 1);
+  body.style.height = `${height}px`;
+  track.style.transition = animate ? "transform 0.6s ease" : "none";
+  track.style.transform = `translateY(${-line.offsetTop}px)`;
+}
+
+function highlightLyric(seconds) {
+  if (!lyricsFollowTime || !syncedLines.length) return;
+  let index = 0;
+  if (seconds >= syncedLines[0].time) {
+    for (let i = 0; i < syncedLines.length; i += 1) {
+      if (syncedLines[i].time <= seconds) index = i;
+      else break;
+    }
+  }
+  if (index === activeLyricIndex) return;
+  positionLyric(index, true);
 }
 
 function showError(message) {
