@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Great+Vibes&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="show-heart">
+<body class="show-heart lyrics-on">
   <div id="ytPlayer"></div>
   <div class="stage">
     <img id="poster" class="poster" src="ChatGPT%20Image%20Sep%2027%2C%202026%2C%2004_32_32%20PM.png" alt="">
@@ -24,12 +24,15 @@
       <p class="status">
         <time id="clock">–:–</time>
       </p>
-      <div class="picker">
+      <div class="top-actions">
+        <button type="button" id="lyricsToggle" class="lyrics-toggle" aria-controls="lyricsPanel" aria-pressed="true">Lyrics</button>
+        <div class="picker">
         <button type="button" id="playlistToggle" class="picker-toggle" aria-haspopup="listbox" aria-expanded="false" aria-controls="playlistMenu">
           <span id="playlistToggleLabel">Bollywood Romantic</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <ul id="playlistMenu" class="picker-menu" role="listbox" hidden></ul>
+        <ul id="playlistMenu" class="picker-menu" role="listbox" hidden>        </ul>
+        </div>
       </div>
     </header>
     <div class="hero">
@@ -40,6 +43,12 @@
       <p class="tagline" id="heroTagline">Love Stories. Timeless Melodies.</p>
       <p id="pageStatus" class="page-status" hidden></p>
     </div>
+
+    <aside id="lyricsPanel" class="lyrics" aria-label="Lyrics">
+      <div id="lyricsBody" class="lyrics-body">
+        <p class="lyrics-status">Lyrics will appear with the song.</p>
+      </div>
+    </aside>
 
     <section class="player" aria-label="Now playing">
       <span class="art-wrap">
