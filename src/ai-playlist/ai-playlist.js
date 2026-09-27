@@ -273,8 +273,8 @@ async function requestWallpaper(scene, apiKey) {
     body: JSON.stringify({
       model,
       prompt: scene,
-      aspect_ratio: "16:9",
-      quality: "medium",
+      size: "1536x1024",
+      quality: "low",
       output_format: "jpeg",
     }),
   });

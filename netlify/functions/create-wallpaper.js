@@ -29,6 +29,7 @@ function postJSON(hostname, path, headers, body) {
       }
     );
     req.on("error", reject);
+    req.setTimeout(22000, () => req.destroy(new Error("Wallpaper timed out")));
     req.write(data);
     req.end();
   });
@@ -71,8 +72,8 @@ exports.handler = async (event) => {
       {
         model,
         prompt,
-        aspect_ratio: "16:9",
-        quality: "medium",
+        size: "1536x1024",
+        quality: "low",
         output_format: "jpeg",
       }
     );
@@ -82,7 +83,10 @@ exports.handler = async (event) => {
 
   const item = Array.isArray(upstream.body?.data) ? upstream.body.data[0] : null;
   const image = item?.b64_json ? dataUrlFromBase64(item.b64_json) : (item?.url || "");
-  if (!image) return reply(502, { error: "The wallpaper model did not return an image." });
+  if (!image) {
+    const message = upstream.body?.error?.message || "The wallpaper model did not return an image.";
+    return reply(502, { error: String(message).slice(0, 240) });
+  }
   return reply(200, { image });
 };
 
