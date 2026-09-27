@@ -1,4 +1,5 @@
 [build]
+  command = "test -f config.js || cp config.example.js config.js"
   publish = "."
   functions = "netlify/functions"
 
