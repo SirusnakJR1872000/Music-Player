@@ -86,7 +86,7 @@ exports.handler = async (event) => {
   const model = String(body.model || process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini").trim();
 
   if (prompt.length < 2) return reply(400, { error: "Tell me what you want to hear." });
-  if (!apiKey) return reply(500, { error: "Add the OpenRouter key in config.js." });
+  if (!apiKey) return reply(500, { error: "Add OPENROUTER_API_KEY in the Netlify environment variables." });
 
   const messages = [
     { role: "system", content: buildSystemPrompt() },
@@ -123,7 +123,7 @@ exports.handler = async (event) => {
   }
 
   if (upstream.status === 401 || upstream.status === 403) {
-    return reply(500, { error: "The OpenRouter key was rejected. Check OPENROUTER_API_KEY in config.js." });
+    return reply(500, { error: "The OpenRouter key was rejected. Check OPENROUTER_API_KEY in the Netlify environment variables." });
   }
   if (upstream.status < 200 || upstream.status >= 300) {
     return reply(502, { error: "The assistant could not answer just now." });

@@ -51,8 +51,8 @@ function parseDuration(iso) {
 
 async function createPlaylist(prompt, history) {
   const apiKey = setting("OPENROUTER_API_KEY");
+  if (!apiKey) return createPlaylistOnServer(prompt, history);
   const model = setting("OPENROUTER_MODEL") || "openai/gpt-4o-mini";
-  if (!apiKey) throw new Error("Add the OpenRouter key in config.js.");
 
   const maxSongs = 12;
   const messages = [
@@ -120,6 +120,29 @@ async function createPlaylist(prompt, history) {
   };
   if (!playlist.songs.length) throw new Error("The assistant did not return any songs.");
   return { type: "playlist", playlist };
+}
+
+async function createPlaylistOnServer(prompt, history) {
+  let response;
+  try {
+    response = await fetch("/.netlify/functions/create-playlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        history,
+        maxSongs: 12,
+        model: setting("OPENROUTER_MODEL") || "openai/gpt-4o-mini",
+      }),
+    });
+  } catch (err) {
+    throw new Error("Could not reach the assistant.");
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(apiMessage(data, "Could not reach the assistant."));
+  if (data?.type === "chat") return { type: "chat", message: data.message };
+  if (!data?.playlist) throw new Error("The assistant did not return any songs.");
+  return data;
 }
 
 async function searchSong(title, artist, apiKey) {
