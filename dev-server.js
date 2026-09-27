@@ -1,7 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { lookupSongs } = require("./netlify/functions/youtube-lookup");
+const { lookupSongs } = require("./netlify/functions/search-youtube");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 8765);
