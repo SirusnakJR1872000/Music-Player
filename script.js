@@ -68,6 +68,7 @@ function bindUi() {
   document.addEventListener("keydown", onKeyDown);
   bindMediaSession();
   bindBackgroundPlayback();
+  setupAnalytics();
   tickClock();
   setInterval(tickClock, 1000);
   renderPlaylistMenu();
@@ -133,6 +134,7 @@ function selectPlaylist(id) {
   }
   activePlaylist = next;
   applyPlaylistTheme();
+  track("playlist_change", { playlist_name: next.label });
   closePlaylistMenu();
   isPlaying = false;
   userWantsPlayback = false;
@@ -313,11 +315,13 @@ function onPlay() {
     playWhenReady = true;
     userWantsPlayback = true;
     enableAudioSession();
+    track("play");
     return;
   }
   if (!mediaLoaded) {
     userWantsPlayback = true;
     enableAudioSession();
+    track("play");
     playSong(currentIndex, { userInitiated: true });
     return;
   }
@@ -368,11 +372,13 @@ function togglePlay() {
   const state = player.getPlayerState();
   if (state === YT.PlayerState.PLAYING) {
     userWantsPlayback = false;
+    track("pause");
     player.pauseVideo();
     return;
   }
   userWantsPlayback = true;
   enableAudioSession();
+  track("play");
   if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.CUED || state === YT.PlayerState.BUFFERING) {
     player.playVideo();
     return;
@@ -382,11 +388,13 @@ function togglePlay() {
 
 function nextSong(userInitiated = false) {
   if (songs.length === 0) return;
+  if (userInitiated) track("next_song");
   playSong(currentIndex < songs.length - 1 ? currentIndex + 1 : 0, { userInitiated });
 }
 
 function prevSong() {
   if (songs.length === 0) return;
+  track("previous_song");
   playSong(currentIndex > 0 ? currentIndex - 1 : songs.length - 1, { userInitiated: true });
 }
 
@@ -436,6 +444,7 @@ function seek(event) {
   const rect = event.currentTarget.getBoundingClientRect();
   const percent = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
   player.seekTo(percent * duration, true);
+  track("seek");
   updateProgress();
 }
 
@@ -515,6 +524,34 @@ function formatTime(seconds) {
 function setText(id, text) {
   const el = $(id);
   if (el) el.textContent = text ?? "";
+}
+
+function measurementId() {
+  const id = String(CONFIG.MEASUREMENT_ID || "").trim();
+  return /^G-[A-Z0-9]+$/i.test(id) ? id : "";
+}
+
+function setupAnalytics() {
+  const id = measurementId();
+  if (!id || window.gtag) return;
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function gtag() {
+    window.dataLayer.push(arguments);
+  };
+  window.gtag("js", new Date());
+  window.gtag("config", id);
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`;
+  document.head.append(script);
+}
+
+function track(eventName, params = {}) {
+  if (!measurementId() || typeof window.gtag !== "function") return;
+  window.gtag("event", eventName, {
+    playlist_name: activePlaylist?.label || "",
+    ...params,
+  });
 }
 
 function enableAudioSession() {

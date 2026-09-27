@@ -3,6 +3,8 @@
 // Restrict the API key by HTTP referrer before you publish the site.
 const CONFIG = {
   API_KEY: "AIzaSyC2kc9vvr90bsTmGspsVr_0YRUCgNC7abA",
+  // Google Analytics 4 measurement ID, for example G-AB12CD34EF. Leave blank to turn tracking off.
+  MEASUREMENT_ID: "G-K3P98FZ02L",
   PLAYLISTS: [
     {
       id: "bollywood-romantic",
