@@ -51,5 +51,14 @@ const CONFIG = {
       image: "classic_songs.png",
       playlistId: "PLPm2B40R0vkYr1H1i7RBJCyNap0ysIQZm",
     },
+    {
+      id: "heartbreak",
+      label: "Heartbreak",
+      title: "Heartbreak",
+      kicker: "Bollywood Songs",
+      tagline: "Rainy Nights. Broken Hearts.",
+      image: "heartbreak.png",
+      playlistId: "PLPm2B40R0vkZruYGlTSXjA_webAhj9wyu",
+    },
   ],
 };
