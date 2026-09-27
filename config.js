@@ -5,6 +5,9 @@ const CONFIG = {
   API_KEY: "AIzaSyC2kc9vvr90bsTmGspsVr_0YRUCgNC7abA",
   // Google Analytics 4 measurement ID, for example G-AB12CD34EF. Leave blank to turn tracking off.
   MEASUREMENT_ID: "G-K3P98FZ02L",
+  // OpenRouter key from https://openrouter.ai/keys. Leave blank to turn Music AI off.
+  OPENROUTER_API_KEY: "",
+  OPENROUTER_MODEL: "openai/gpt-4o-mini",
   PLAYLISTS: [
     {
       id: "bollywood-romantic",
@@ -62,3 +65,5 @@ const CONFIG = {
     },
   ],
 };
+
+window.CONFIG = CONFIG;

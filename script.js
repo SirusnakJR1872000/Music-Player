@@ -203,7 +203,8 @@ window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
           iframe.setAttribute("playsinline", "1");
           iframe.setAttribute("webkit-playsinline", "1");
         }
-        if (isConfigured(getConfig())) loadPlaylist();
+        if (activePlaylist?.id === "ai-mix" && songs.length) playSong(currentIndex, { userInitiated: true });
+        else if (isConfigured(getConfig())) loadPlaylist();
       },
       onStateChange: onPlayerStateChange,
       onError: onPlayerError,
@@ -212,6 +213,7 @@ window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
 };
 
 async function loadPlaylist() {
+  if (activePlaylist?.id === "ai-mix") return;
   const cfg = getConfig();
   if (!isConfigured(cfg)) {
     showError("This playlist is not available right now.");
@@ -922,6 +924,40 @@ function showError(message) {
     status.textContent = message;
   }
 }
+
+window.loadAIQueue = function loadAIQueue(tracks, meta = {}) {
+  const playable = (tracks || []).filter((track) => track && track.videoId);
+  if (!playable.length) return false;
+  loadToken += 1;
+  songs = playable.map((track) => ({
+    durationSeconds: Number(track.duration) || 0,
+    snippet: {
+      title: track.title || "Untitled",
+      videoOwnerChannelTitle: track.artist || "",
+      thumbnails: track.thumbnail ? { medium: { url: track.thumbnail } } : {},
+      resourceId: { videoId: track.videoId },
+    },
+  }));
+  currentIndex = 0;
+  embedSkipCount = 0;
+  mediaLoaded = false;
+  userWantsPlayback = true;
+  playWhenReady = false;
+  if (meta.name) setText("playlistToggleLabel", meta.name);
+  const status = $("pageStatus");
+  if (status) status.hidden = true;
+  document.querySelectorAll("#playlistMenu button").forEach((button) => {
+    button.setAttribute("aria-selected", "false");
+  });
+  activePlaylist = {
+    ...(activePlaylist || {}),
+    id: "ai-mix",
+    label: meta.name || "Music AI",
+  };
+  track("playlist_change", { playlist_name: meta.name || "Music AI" });
+  playSong(0, { userInitiated: true });
+  return true;
+};
 
 bindUi();
 bootstrap();
