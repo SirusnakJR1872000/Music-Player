@@ -478,13 +478,6 @@ body:not(.lyrics-on) .lyrics {
   background: rgba(255, 255, 255, 0.22);
 }
 
-@media (min-width: 960px) {
-  .hero,
-  .player {
-    margin-right: calc(332px + max(16px, env(safe-area-inset-right)));
-  }
-}
-
 @media (max-width: 959px) {
   .lyrics {
     top: max(112px, calc(env(safe-area-inset-top) + 96px));
@@ -560,18 +553,4 @@ body:not(.lyrics-on) .lyrics {
   .transport button { width: 44px; height: 44px; }
   .transport .transport-play { width: 48px; height: 48px; }
   .picker-menu button { padding: 12px; font-size: 15px; }
-}
-
-@media (min-width: 960px) {
-  .hero {
-    width: min(640px, calc(100% - 400px));
-    margin-left: auto;
-    margin-right: calc(332px + max(16px, env(safe-area-inset-right)));
-  }
-
-  .player {
-    width: min(var(--player-width), calc(100% - 400px));
-    margin-left: auto;
-    margin-right: calc(332px + max(16px, env(safe-area-inset-right)));
-  }
 }
