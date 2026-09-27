@@ -118,7 +118,7 @@ function followUpChips(playlist) {
   setChips([
     { label: "More like this", prompt: `More songs like ${name}. Keep the same mood.` },
     { label: "Add some classics", prompt: `Add some classic songs to ${name}.` },
-    { label: "Make it longer", prompt: `Make ${name} longer with more songs in the same mood.` },
+    { label: "Make it longer", prompt: `Make ${name} longer with 25 songs in the same mood.` },
   ]);
 }
 

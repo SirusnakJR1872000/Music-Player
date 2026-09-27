@@ -140,8 +140,8 @@ async function searchSong(title, artist) {
 async function lookupSongs(songs) {
   const results = [];
   const list = (Array.isArray(songs) ? songs : []).slice(0, 25);
-  for (let i = 0; i < list.length; i += 4) {
-    const batch = list.slice(i, i + 4);
+  for (let i = 0; i < list.length; i += 8) {
+    const batch = list.slice(i, i + 8);
     const found = await Promise.all(
       batch.map((song) => {
         const title = String((song && song.title) || "").trim();

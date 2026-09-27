@@ -34,6 +34,27 @@ function postJSON(hostname, path, headers, body) {
   });
 }
 
+function songCount(prompt, fallback) {
+  const text = String(prompt || "").toLowerCase();
+  const numbered = text.match(/\b(\d{1,2})\s+songs?\b/);
+  const named = [
+    ["twenty five", 25], ["twenty-five", 25], ["twenty", 20], ["fifteen", 15],
+    ["twelve", 12], ["ten", 10], ["eight", 8], ["five", 5],
+  ];
+  let count = null;
+  if (numbered) count = Number(numbered[1]);
+  else {
+    const word = named.find(([label]) => text.includes(`${label} song`));
+    if (word) count = word[1];
+    else if (/\blonger\b|\bmore songs\b/.test(text)) count = 25;
+  }
+  if (!count) {
+    const fromClient = Number(fallback);
+    count = fromClient >= 20 && fromClient <= 25 ? fromClient : 20;
+  }
+  return Math.min(25, Math.max(1, count));
+}
+
 function buildSystemPrompt() {
   return `You are Music AI, a friendly music companion inside a music player.
 When a user talks to you, return ONLY a valid JSON object. No markdown. No text outside the JSON.
@@ -57,7 +78,7 @@ If they are greeting you, asking what you can do, or not asking for music yet, r
 }
 
 Playlist rules:
-- If the user asks for a number of songs, return exactly that many, up to 25. Otherwise return 12.
+- If the user asks for a number of songs, return exactly that many, up to 25. Otherwise return 20. Never stop at 12 unless they asked for 12.
 - Hindi, English, and Marathi songs are all allowed. Use the language they ask for. If they do not name one, mix languages when it fits the mood.
 - For Hindi and Marathi, write the title in the romanized spelling people type on YouTube, and use the singer's name.
 - Prefer well-known songs that can be played on YouTube. Do not stop after 2 or 3 songs.
@@ -80,7 +101,7 @@ exports.handler = async (event) => {
   }
 
   const prompt = String(body.prompt || "").trim().slice(0, 500);
-  const maxSongs = Math.min(25, Math.max(1, Number(body.maxSongs) || 12));
+  const maxSongs = songCount(prompt, body.maxSongs);
   const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
 
   const apiKey = String(body.apiKey || process.env.OPENROUTER_API_KEY || "").trim();
@@ -159,9 +180,68 @@ exports.handler = async (event) => {
     })).filter((song) => song.title && song.artist),
   };
 
+  if (playlist.songs.length < maxSongs) {
+    const more = await extraSongs(apiKey, model, prompt, playlist.songs, maxSongs - playlist.songs.length);
+    const seen = new Set(playlist.songs.map((song) => `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`));
+    more.forEach((song) => {
+      const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+      if (seen.has(key) || playlist.songs.length >= maxSongs) return;
+      seen.add(key);
+      playlist.songs.push(song);
+    });
+  }
+
   if (!playlist.songs.length) return reply(502, { error: "The assistant did not return any songs." });
   return reply(200, { type: "playlist", playlist });
 };
+
+async function extraSongs(apiKey, model, prompt, have, need) {
+  if (!need) return [];
+  const chosen = have.map((song) => `${song.title} - ${song.artist}`).join(", ");
+  let upstream;
+  try {
+    upstream = await postJSON(
+      "openrouter.ai",
+      "/api/v1/chat/completions",
+      {
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://your-playlist.netlify.app",
+        "X-Title": "Music Player",
+      },
+      {
+        model,
+        temperature: 0.7,
+        max_tokens: Math.max(900, need * 160),
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "Return only JSON: {\"songs\":[{\"title\":\"exact song title\",\"artist\":\"artist name\",\"reason\":\"one short sentence\"}]}",
+          },
+          {
+            role: "user",
+            content: `${prompt}\nAlready chosen: ${chosen}\nReturn exactly ${need} more different songs. Do not repeat any song above.`,
+          },
+        ],
+      }
+    );
+  } catch (err) {
+    return [];
+  }
+  if (upstream.status < 200 || upstream.status >= 300) return [];
+  try {
+    const raw = upstream.body?.choices?.[0]?.message?.content || "";
+    const parsed = JSON.parse(raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim());
+    if (!Array.isArray(parsed.songs)) return [];
+    return parsed.songs.slice(0, need).map((song) => ({
+      title: String(song.title || "").trim(),
+      artist: String(song.artist || "").trim(),
+      reason: String(song.reason || "").trim(),
+    })).filter((song) => song.title && song.artist);
+  } catch (err) {
+    return [];
+  }
+}
 
 function corsHeaders() {
   return {

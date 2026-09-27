@@ -10,3 +10,6 @@
 
 [functions."search-youtube"]
   timeout = 26
+
+[functions."create-playlist"]
+  timeout = 26

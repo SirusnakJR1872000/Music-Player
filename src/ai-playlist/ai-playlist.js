@@ -24,7 +24,7 @@ If they are greeting you, asking what you can do, or not asking for music yet, r
 }
 
 Playlist rules:
-- If the user asks for a number of songs, return exactly that many, up to 25. Otherwise return 12.
+- If the user asks for a number of songs, return exactly that many, up to 25. Otherwise return 20. Never stop at 12 unless they asked for 12.
 - Hindi, English, and Marathi songs are all allowed. Use the language they ask for. If they do not name one, mix languages when it fits the mood.
 - For Hindi and Marathi, write the title in the romanized spelling people type on YouTube, and use the singer's name.
 - Prefer well-known songs that can be played on YouTube. Do not stop after 2 or 3 songs.
@@ -39,11 +39,12 @@ function songCount(prompt) {
     ["twenty five", 25], ["twenty-five", 25], ["twenty", 20], ["fifteen", 15],
     ["twelve", 12], ["ten", 10], ["eight", 8], ["five", 5],
   ];
-  let count = 12;
+  let count = 20;
   if (numbered) count = Number(numbered[1]);
   else {
     const word = named.find(([label]) => text.includes(`${label} song`));
     if (word) count = word[1];
+    else if (/\blonger\b|\bmore songs\b/.test(text)) count = 25;
   }
   return Math.min(25, Math.max(1, count));
 }
