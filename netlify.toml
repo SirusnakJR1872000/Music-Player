@@ -4,3 +4,9 @@
 
 [functions]
   node_bundler = "none"
+
+[functions."create-wallpaper"]
+  timeout = 26
+
+[functions."search-youtube"]
+  timeout = 26

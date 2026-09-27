@@ -24,12 +24,29 @@ If they are greeting you, asking what you can do, or not asking for music yet, r
 }
 
 Playlist rules:
-- Return 12 songs unless the user asks for a different number, never more than 18.
-- Prefer well-known, officially released songs that are on YouTube.
-- For Bollywood, use the original Hindi title and the singer, not the film name.
-- Match the requested mood. Do not repeat an artist more than 3 times.
+- If the user asks for a number of songs, return exactly that many, up to 25. Otherwise return 12.
+- Hindi, English, and Marathi songs are all allowed. Use the language they ask for. If they do not name one, mix languages when it fits the mood.
+- For Hindi and Marathi, write the title in the romanized spelling people type on YouTube, and use the singer's name.
+- Prefer well-known songs that can be played on YouTube. Do not stop after 2 or 3 songs.
+- Do not repeat an artist more than 3 times.
 - Order the songs so the playlist flows.
 - Only return the JSON object.`;
+
+function songCount(prompt) {
+  const text = String(prompt || "").toLowerCase();
+  const numbered = text.match(/\b(\d{1,2})\s+songs?\b/);
+  const named = [
+    ["twenty five", 25], ["twenty-five", 25], ["twenty", 20], ["fifteen", 15],
+    ["twelve", 12], ["ten", 10], ["eight", 8], ["five", 5],
+  ];
+  let count = 12;
+  if (numbered) count = Number(numbered[1]);
+  else {
+    const word = named.find(([label]) => text.includes(`${label} song`));
+    if (word) count = word[1];
+  }
+  return Math.min(25, Math.max(1, count));
+}
 
 function setting(name) {
   return String(window.CONFIG?.[name] || "").trim();
@@ -42,26 +59,19 @@ function apiMessage(data, fallback) {
   return fallback;
 }
 
-function parseDuration(iso) {
-  if (!iso) return 0;
-  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return 0;
-  return Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0);
-}
-
 async function createPlaylist(prompt, history) {
   const apiKey = setting("OPENROUTER_API_KEY");
   if (!apiKey) return createPlaylistOnServer(prompt, history);
   const model = setting("OPENROUTER_MODEL") || "openai/gpt-4o-mini";
 
-  const maxSongs = 12;
+  const maxSongs = songCount(prompt);
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
     ...history
       .filter((item) => item && (item.role === "user" || item.role === "assistant"))
       .slice(-6)
       .map((item) => ({ role: item.role, content: String(item.content || "").slice(0, 1500) })),
-    { role: "user", content: `${prompt}\nMax songs: ${maxSongs}` },
+    { role: "user", content: `${prompt}\nReturn exactly ${maxSongs} songs. Hindi, English, and Marathi are all fine.` },
   ];
 
   let response;
@@ -77,7 +87,7 @@ async function createPlaylist(prompt, history) {
       body: JSON.stringify({
         model,
         temperature: 0.7,
-        max_tokens: 1800,
+        max_tokens: Math.max(2200, maxSongs * 160),
         response_format: { type: "json_object" },
         messages,
       }),
@@ -112,7 +122,7 @@ async function createPlaylist(prompt, history) {
     description: String(parsed.description || "").trim(),
     reasoning: String(parsed.reasoning || "").trim(),
     message: String(parsed.message || "Here's a curated playlist just for you.").trim(),
-    songs: parsed.songs.slice(0, 18).map((song) => ({
+    songs: parsed.songs.slice(0, maxSongs).map((song) => ({
       title: String(song.title || "").trim(),
       artist: String(song.artist || "").trim(),
       reason: String(song.reason || "").trim(),
@@ -131,7 +141,7 @@ async function createPlaylistOnServer(prompt, history) {
       body: JSON.stringify({
         prompt,
         history,
-        maxSongs: 12,
+        maxSongs: songCount(prompt),
         model: setting("OPENROUTER_MODEL") || "openai/gpt-4o-mini",
       }),
     });
@@ -145,42 +155,24 @@ async function createPlaylistOnServer(prompt, history) {
   return data;
 }
 
-async function searchSong(title, artist, apiKey) {
-  const query = encodeURIComponent(`${title} ${artist} official audio`);
-  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=4&videoCategoryId=10&q=${query}&key=${encodeURIComponent(apiKey)}`;
-  const searchData = await fetch(searchUrl).then((response) => response.json());
-  if (searchData.error) throw new Error(searchData.error.message || "YouTube search failed.");
-  const ids = (searchData.items || []).map((item) => item.id?.videoId).filter(Boolean);
-  if (!ids.length) return null;
-
-  const detailUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=${ids.join(",")}&key=${encodeURIComponent(apiKey)}`;
-  const detailData = await fetch(detailUrl).then((response) => response.json());
-  const embeddable = (detailData.items || []).find(
-    (video) => video.status?.embeddable === true && video.status?.privacyStatus === "public"
-  );
-  if (!embeddable) return null;
-  const thumbs = embeddable.snippet.thumbnails || {};
-  return {
-    title,
-    artist,
-    videoId: embeddable.id,
-    thumbnail: thumbs.medium?.url || thumbs.default?.url || "",
-    ytTitle: embeddable.snippet.title,
-    duration: parseDuration(embeddable.contentDetails?.duration),
-  };
-}
-
 async function searchSongs(songs) {
-  const apiKey = setting("API_KEY");
-  if (!apiKey) throw new Error("The YouTube key in config.js is missing.");
-  const results = [];
-  for (let i = 0; i < songs.length; i += 4) {
-    const batch = await Promise.all(songs.slice(i, i + 4).map((song) => (
-      searchSong(song.title, song.artist, apiKey).catch(() => null)
-    )));
-    results.push(...batch);
+  let response;
+  try {
+    response = await fetch("/.netlify/functions/search-youtube", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        songs: songs.map((song) => ({ title: song.title, artist: song.artist })),
+      }),
+    });
+  } catch (err) {
+    throw new Error("Could not look up those songs. Try again in a little while.");
   }
-  return results.filter(Boolean);
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(apiMessage(data, "No playable songs were found. Try a different mood or artist."));
+  }
+  return Array.isArray(data?.songs) ? data.songs : [];
 }
 
 export async function askMusicAI(prompt, { history = [], onProgress } = {}) {
@@ -191,15 +183,18 @@ export async function askMusicAI(prompt, { history = [], onProgress } = {}) {
   if (aiData.type === "chat") return aiData;
 
   const playlist = aiData.playlist;
-  progress("cache", `Got ${playlist.songs.length} songs. Matching them on YouTube…`);
   const { cached, uncached } = splitByCache(playlist.songs);
+  progress("searching", "Matching songs and painting the wallpaper…");
 
-  let freshResults = [];
-  if (uncached.length) {
-    progress("searching", `Searching YouTube for ${uncached.length} song${uncached.length === 1 ? "" : "s"}…`);
-    freshResults = await searchSongs(uncached);
-    bulkSetCache(freshResults);
-  }
+  const [freshResults, wallpaper] = await Promise.all([
+    (async () => {
+      if (!uncached.length) return [];
+      const found = await searchSongs(uncached);
+      bulkSetCache(found);
+      return found;
+    })(),
+    createWallpaper(playlist, prompt),
+  ]);
 
   const allFound = [...cached, ...freshResults];
   const orderedSongs = playlist.songs
@@ -225,6 +220,7 @@ export async function askMusicAI(prompt, { history = [], onProgress } = {}) {
   };
   const saved = savePlaylist(finalPlaylist);
   if (saved) finalPlaylist.savedId = saved.id;
+  if (wallpaper) finalPlaylist.wallpaper = wallpaper;
   recordPlay({
     prompt,
     playlistName: playlist.playlistName,
@@ -237,4 +233,78 @@ export async function askMusicAI(prompt, { history = [], onProgress } = {}) {
 
 export function loadSharedPlaylist() {
   return readSharedPlaylist();
+}
+
+function wallpaperPrompt(playlist, userPrompt) {
+  const titles = (playlist.songs || []).slice(0, 4).map((song) => song.title).filter(Boolean).join(", ");
+  return [
+    "Cinematic painterly illustration for a music-player wallpaper, wide landscape, rich color, soft film lighting.",
+    "No text, no letters, no watermark, no logo, no frame, no user interface.",
+    `Mood and title: ${playlist.playlistName || "Playlist"}. ${playlist.description || ""}`,
+    `Listener request: ${userPrompt || ""}.`,
+    titles ? `Inspired by these songs: ${titles}.` : "",
+  ].filter(Boolean).join(" ");
+}
+
+function dataUrlFromBase64(b64) {
+  const mime = String(b64).startsWith("iVBOR") ? "image/png" : "image/jpeg";
+  return `data:${mime};base64,${b64}`;
+}
+
+function imageFromPayload(data) {
+  const item = Array.isArray(data?.data) ? data.data[0] : null;
+  if (!item) return "";
+  if (item.b64_json) return dataUrlFromBase64(item.b64_json);
+  if (typeof item.url === "string") return item.url;
+  return "";
+}
+
+async function requestWallpaper(scene, apiKey) {
+  const model = setting("OPENROUTER_IMAGE_MODEL") || "openai/gpt-image-1";
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+    "HTTP-Referer": window.location.origin,
+    "X-Title": "Music Player",
+  };
+  const full = await fetch("https://openrouter.ai/api/v1/images", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      prompt: scene,
+      aspect_ratio: "16:9",
+      quality: "medium",
+      output_format: "jpeg",
+    }),
+  });
+  if (full.ok) return imageFromPayload(await full.json().catch(() => null));
+  const plain = await fetch("https://openrouter.ai/api/v1/images", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ model, prompt: scene }),
+  });
+  if (!plain.ok) return "";
+  return imageFromPayload(await plain.json().catch(() => null));
+}
+
+async function createWallpaper(playlist, userPrompt) {
+  const scene = wallpaperPrompt(playlist, userPrompt);
+  try {
+    const apiKey = setting("OPENROUTER_API_KEY");
+    if (apiKey) return await requestWallpaper(scene, apiKey);
+    const response = await fetch("/.netlify/functions/create-wallpaper", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: scene,
+        model: setting("OPENROUTER_IMAGE_MODEL") || "openai/gpt-image-1",
+      }),
+    });
+    if (!response.ok) return "";
+    const data = await response.json().catch(() => null);
+    return data?.image || "";
+  } catch (err) {
+    return "";
+  }
 }

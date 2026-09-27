@@ -19,6 +19,9 @@ let lyricsForId = "";
 let syncedLines = [];
 let lyricsFollowTime = false;
 let activeLyricIndex = -1;
+let shuffleOn = false;
+let shuffleOrder = [];
+let shufflePos = 0;
 
 function isPlaceholder(value) {
   return !value || String(value).includes("YOUR_");
@@ -60,6 +63,7 @@ function bindUi() {
     el.innerHTML = PLAY_ICON;
   });
   $("playBtn").addEventListener("click", onPlay);
+  $("shuffleBtn")?.addEventListener("click", () => setShuffleEnabled(!shuffleOn));
   $("nextBtn").addEventListener("click", () => nextSong(true));
   $("prevBtn").addEventListener("click", prevSong);
   $("progressBar").addEventListener("click", seek);
@@ -76,6 +80,7 @@ function bindUi() {
     setLyricsEnabled(!document.body.classList.contains("lyrics-on"));
   });
   setLyricsEnabled(savedLyricsEnabled());
+  setShuffleEnabled(savedShuffleEnabled());
   bindMediaSession();
   bindBackgroundPlayback();
   setupAnalytics();
@@ -262,6 +267,7 @@ async function loadPlaylist() {
     if (token !== loadToken) return;
     songs = allSongs;
     currentIndex = 0;
+    if (shuffleOn) rebuildShuffle();
 
     if (songs.length === 0) {
       showError("This playlist has no playable public videos.");
@@ -398,16 +404,63 @@ function togglePlay() {
   playSong(currentIndex, { userInitiated: true });
 }
 
+function savedShuffleEnabled() {
+  try {
+    return localStorage.getItem("music-player-shuffle") === "on";
+  } catch (err) {
+    return false;
+  }
+}
+
+function rebuildShuffle() {
+  const order = songs.map((_, index) => index);
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const swap = Math.floor(Math.random() * (i + 1));
+    [order[i], order[swap]] = [order[swap], order[i]];
+  }
+  const here = order.indexOf(currentIndex);
+  if (here > 0) {
+    order.splice(here, 1);
+    order.unshift(currentIndex);
+  }
+  shuffleOrder = order;
+  shufflePos = Math.max(0, order.indexOf(currentIndex));
+}
+
+function setShuffleEnabled(on) {
+  shuffleOn = on;
+  const button = $("shuffleBtn");
+  if (button) {
+    button.setAttribute("aria-pressed", String(on));
+    button.setAttribute("aria-label", on ? "Turn shuffle off" : "Turn shuffle on");
+  }
+  if (on && songs.length) rebuildShuffle();
+  try {
+    localStorage.setItem("music-player-shuffle", on ? "on" : "off");
+  } catch (err) {
+    // Playback continues even if the choice cannot be saved.
+  }
+}
+
+function neighborIndex(step) {
+  if (!shuffleOn || songs.length < 2) {
+    return (currentIndex + step + songs.length) % songs.length;
+  }
+  if (shuffleOrder.length !== songs.length) rebuildShuffle();
+  shufflePos = (shufflePos + step + shuffleOrder.length) % shuffleOrder.length;
+  return shuffleOrder[shufflePos];
+}
+
 function nextSong(userInitiated = false) {
   if (songs.length === 0) return;
   if (userInitiated) track("next_song");
-  playSong(currentIndex < songs.length - 1 ? currentIndex + 1 : 0, { userInitiated });
+  playSong(neighborIndex(1), { userInitiated });
 }
 
 function prevSong() {
   if (songs.length === 0) return;
   track("previous_song");
-  playSong(currentIndex > 0 ? currentIndex - 1 : songs.length - 1, { userInitiated: true });
+  playSong(neighborIndex(-1), { userInitiated: true });
 }
 
 function updateNowPlaying() {
@@ -939,11 +992,25 @@ window.loadAIQueue = function loadAIQueue(tracks, meta = {}) {
     },
   }));
   currentIndex = 0;
+  if (shuffleOn) rebuildShuffle();
   embedSkipCount = 0;
   mediaLoaded = false;
   userWantsPlayback = true;
   playWhenReady = false;
-  if (meta.name) setText("playlistToggleLabel", meta.name);
+  document.body.classList.remove("show-heart");
+  const name = meta.name || "Music AI";
+  setText("heroTitle", name);
+  setText("heroKicker", meta.kicker || "Music AI");
+  setText("heroTagline", meta.tagline || "");
+  setText("playlistToggleLabel", name);
+  document.title = name;
+  if (meta.image) {
+    const poster = $("poster");
+    if (poster) {
+      poster.src = meta.image;
+      poster.alt = name;
+    }
+  }
   const status = $("pageStatus");
   if (status) status.hidden = true;
   document.querySelectorAll("#playlistMenu button").forEach((button) => {

@@ -59,7 +59,9 @@ function formatLength(songs) {
 
 function showPlaylistCard(playlist) {
   const card = el("article", "ai-mix");
-  const shot = playlist.songs.find((song) => song.thumbnail);
+  const shot = playlist.wallpaper
+    ? { thumbnail: playlist.wallpaper }
+    : playlist.songs.find((song) => song.thumbnail);
   if (shot) {
     const image = document.createElement("img");
     image.alt = "";
@@ -85,7 +87,12 @@ function showPlaylistCard(playlist) {
 function playPlaylist(playlist) {
   const songs = playlist.songs || [];
   if (typeof window.loadAIQueue !== "function") return;
-  const started = window.loadAIQueue(songs, { name: playlist.playlistName || playlist.name || "Music AI" });
+  const started = window.loadAIQueue(songs, {
+    name: playlist.playlistName || playlist.name || "Music AI",
+    kicker: "Music AI",
+    tagline: playlist.description || "",
+    image: playlist.wallpaper || "",
+  });
   if (!started) {
     addBubble("Those songs are not ready to play yet.", "bot");
     return;
@@ -129,7 +136,13 @@ async function submit(raw) {
   addBubble(prompt, "user");
   const typing = showTyping();
   try {
-    const result = await askMusicAI(prompt, { history });
+    const result = await askMusicAI(prompt, {
+      history,
+      onProgress: (step, message) => {
+        const bubble = typing.querySelector(".ai-bubble");
+        if (bubble && message) bubble.textContent = message;
+      },
+    });
     typing.remove();
     if (result.type === "chat") {
       addBubble(result.message, "bot");

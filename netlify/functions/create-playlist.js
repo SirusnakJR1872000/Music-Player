@@ -57,10 +57,11 @@ If they are greeting you, asking what you can do, or not asking for music yet, r
 }
 
 Playlist rules:
-- Return 12 songs unless the user asks for a different number, never more than 18.
-- Prefer well-known, officially released songs that are on YouTube.
-- For Bollywood, use the original Hindi title and the singer, not the film name.
-- Match the requested mood. Do not repeat an artist more than 3 times.
+- If the user asks for a number of songs, return exactly that many, up to 25. Otherwise return 12.
+- Hindi, English, and Marathi songs are all allowed. Use the language they ask for. If they do not name one, mix languages when it fits the mood.
+- For Hindi and Marathi, write the title in the romanized spelling people type on YouTube, and use the singer's name.
+- Prefer well-known songs that can be played on YouTube. Do not stop after 2 or 3 songs.
+- Do not repeat an artist more than 3 times.
 - Order the songs so the playlist flows.
 - Only return the JSON object.`;
 }
@@ -79,7 +80,7 @@ exports.handler = async (event) => {
   }
 
   const prompt = String(body.prompt || "").trim().slice(0, 500);
-  const maxSongs = Math.min(18, Math.max(8, Number(body.maxSongs) || 12));
+  const maxSongs = Math.min(25, Math.max(1, Number(body.maxSongs) || 12));
   const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
 
   const apiKey = String(body.apiKey || process.env.OPENROUTER_API_KEY || "").trim();
@@ -96,7 +97,7 @@ exports.handler = async (event) => {
         role: item.role,
         content: String(item.content || "").slice(0, 1500),
       })),
-    { role: "user", content: `${prompt}\nMax songs: ${maxSongs}` },
+    { role: "user", content: `${prompt}\nReturn exactly ${maxSongs} songs. Hindi, English, and Marathi are all fine.` },
   ];
 
   let upstream;
@@ -112,7 +113,7 @@ exports.handler = async (event) => {
       {
         model,
         temperature: 0.7,
-        max_tokens: 1800,
+        max_tokens: Math.max(2200, maxSongs * 160),
         response_format: { type: "json_object" },
         messages,
       }
