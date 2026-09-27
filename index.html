@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Romantic Bollywood Songs</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♥</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Great+Vibes&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="show-heart">
+  <div id="ytPlayer"></div>
+  <div class="stage">
+    <img id="poster" class="poster" src="ChatGPT%20Image%20Sep%2027%2C%202026%2C%2004_32_32%20PM.png" alt="">
+
+    <p class="status">
+      <time id="clock">–:–</time>
+    </p>
+    <div class="picker">
+      <button type="button" id="playlistToggle" class="picker-toggle" aria-haspopup="listbox" aria-expanded="false" aria-controls="playlistMenu">
+        <span id="playlistToggleLabel">Bollywood Romantic</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <ul id="playlistMenu" class="picker-menu" role="listbox" hidden></ul>
+    </div>
+    <div class="hero">
+      <svg id="heroHeart" class="heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.2s-6.8-4.2-9-8.6C1.4 8 2.9 4.6 6.2 4.6c1.9 0 3.1 1 3.8 2.1.7-1.1 1.9-2.1 3.8-2.1 3.3 0 4.8 3.4 3.2 7C18.8 16 12 20.2 12 20.2z"/></svg>
+      <h1 id="heroTitle">Romantic</h1>
+      <p class="kicker" id="heroKicker">Bollywood Songs</p>
+      <span class="brush" aria-hidden="true"></span>
+      <p class="tagline" id="heroTagline">Love Stories. Timeless Melodies.</p>
+      <p id="pageStatus" class="page-status" hidden></p>
+    </div>
+
+    <section class="player" aria-label="Now playing">
+      <span class="art-wrap">
+        <img id="barArt" class="art" alt="" hidden>
+      </span>
+      <div class="meta">
+        <strong id="songTitle">Loading playlist</strong>
+        <span id="channelName"></span>
+      </div>
+      <div class="transport">
+        <button type="button" id="prevBtn" class="skip" aria-label="Previous">
+          <svg viewBox="0 0 24 24"><path d="M14.5 7.5L9 12l5.5 4.5"/></svg>
+        </button>
+        <button type="button" id="playBtn" class="transport-play" aria-label="Play">
+          <span data-play-icon></span>
+        </button>
+        <button type="button" id="nextBtn" class="skip" aria-label="Next">
+          <svg viewBox="0 0 24 24"><path d="M9.5 7.5L15 12l-5.5 4.5"/></svg>
+        </button>
+      </div>
+      <div class="scrub">
+        <span id="currentTime">0:00</span>
+        <div id="progressBar" class="track" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+          <div id="progressFill"></div>
+        </div>
+        <span id="duration">0:00</span>
+      </div>
+      <p id="playerMessage" class="player-message" hidden></p>
+    </section>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
